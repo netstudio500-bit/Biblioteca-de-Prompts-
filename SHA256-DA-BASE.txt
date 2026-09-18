@@ -1,0 +1,27 @@
+# SHA256 DA BASE
+
+ARQUIVO ZIP:
+- BOT.IA-BASE-COMPLETA.zip
+- tamanho: 111577997 bytes
+- SHA-256: 48a8919c81b8d844960538ee5b88f0ee656931baed286efa2254ddb0b0c9176c
+
+ARQUIVOS CRÍTICOS:
+- src/main.jsx: NÃO EXISTE
+- src/styles.css: NÃO EXISTE
+- src/agent/AgentCore.js: NÃO EXISTE
+- src/agent/OllamaClient.js: NÃO EXISTE
+- src/agent/ModelRouter.js: NÃO EXISTE
+- src/agent/ToolRegistry.js: NÃO EXISTE
+- src/agent/toolSchemas.js: NÃO EXISTE
+- src/agent/ContextManager.js: NÃO EXISTE
+- src/agent/ResponseValidator.js: NÃO EXISTE
+- src/agent/SystemPrompt.js: NÃO EXISTE
+- src/agent/AgentWatchdog.js: NÃO EXISTE
+- src/agent/index.js: NÃO EXISTE
+- electron/main.cjs: 6943 bytes | cb400d99a6301cc77723e21e9ae949160125a012e42a711ec29248707c679f67
+- electron/preload.cjs: 1215 bytes | ebb9ce2c21d7da807e9bd82ba9f46e2bd788f834e60c41bc6aefe4d6dff103d9
+- electron/fs-audit.cjs: 21269 bytes | 3ead3454a7b9f1681ca06a38a430ba7efc359965288a67b297d782fbbcd76485
+- package.json: 1348 bytes | 8ceea5c2ef401a628736b71941d2a75906eb8846e6b07e2679532dd46a8142ce
+- package-lock.json: 175968 bytes | b8578d7e0b7a302033c0f63130b45770ddcd9ba1d67bc63fae0337904ff726c3
+- vite.config.mjs: 206 bytes | 589be02d5b9b50ec30ec964943179fbb323839dfae798fe5fd124ea219cf4c27
+- index.html: 748 bytes | 35f528cfff8c23a14e6ecb9cec9f6a5f864a3a65c9a692353708598b4dd55b4f
