@@ -1,0 +1,34 @@
+SHA256 DA ENTREGA GITHUB
+
+Repositorio: netstudio500-bit/Biblioteca-de-Prompts-
+Versao: 1.0.2
+Installer 1.0.3: AGUARDANDO WINDOWS REAL
+
+ARQUIVOS CRITICOS
+8ceea5c2ef401a628736b71941d2a75906eb8846e6b07e2679532dd46a8142ce  package.json
+b8578d7e0b7a302033c0f63130b45770ddcd9ba1d67bc63fae0337904ff726c3  package-lock.json
+9a904386902a63407fade9ef8c3ff8d02250f9e88737f4a11c886efdb6b8cef  index.html
+fa1ffb9f9100ad6601fd161dd406c597a0e82818e6a27aa33a63a235699fc5f5  main.jsx
+2a6504464ef6cb856ec6921f87ec12b1791da55e8d5e571576616932ceb9a132  styles.css
+589be02d5b9b50ec30ec964943179fbb323839dfae798fe5fd124ea219cf4c27  vite.config.mjs
+a6c26ae1fcb0231d1800b7b01e38db42f75925e2c38a169f7bce86c385649d19  agent/AgentCore.js
+ffe1134fb3a7703f9dd6ba7fd86345ceb3f3937d2bda1cc9991fdebf5c3f604b  agent/AgentWatchdog.js
+20a857880f9b10022db939a7751b8ce2e7927fe5dddd2168b1899b7e03778319  agent/OllamaClient.js
+1b503ac760eca88d0004924f893c8fd9262b41b40575acd5ffc5dc3b4ad0ee81  agent/ToolRegistry.js
+242a83a2eb0cc5a151445410b737ed0c0bdd5c18480907da20ba8a60b17a74f6  agent/ModelRouter.js
+8f5a159742f6b61814b3ee9ddd681e9b868a625bfbafd247aebaf51753b15050  agent/ContextManager.js
+bedfcdd706bd4d158c5cc97da45b601fba96671474a598ce6e6e7e7cdc8bd784  agent/ResponseValidator.js
+13845d01299912b51b999e26815c2c5a0f29004d62c2766b40c8e2bcf4fbe749  agent/index.js
+cb400d99a6301cc77723e21e9ae949160125a012e42a711ec29248707c679f67  electron/main.cjs
+ebb9ce2c21d7da807e9bd82ba9f46e2bd788f834e60c41bc6aefe4d6dff103d9  electron/preload.cjs
+3ead3454a7b9f1681ca06a38a430ba7efc359965288a67b297d782fbbcd76485  electron/fs-audit.cjs
+3d4f01d5cc59c338c5543e6cef4df6ca6a9877b1960a6b3176c2c9a82a4050aa  cert-runtime-1.0.3.cjs
+6c9b055dbdde11cffa12265b6a6aa0e9cbb602afacaf074197a95a1310ba6b21  VALIDACAO-WINDOWS-1.0.3.md
+c838351930c0ddd9c242aa7a6e1505c272acbb49090220c321999b04ed43241b  VALIDAR-WINDOWS-1.0.3.ps1
+0ca19656921170fd994040d4043fe28b394c82d5a378054d828e986ecdb5f0f4  CHECKLIST-CERTIFICACAO-1.0.3-WINDOWS.md
+466aa1ac1f347f407829f3dd42194015c1a5bf2d25caca52087a4e2981364d16  RELATORIO-RUNTIME-1.0.3.md
+
+INSTALLER HISTORICO 1.0.2
+7ac452c49c89385eea8b3f745034842b5574cc0e358944c600366db9aa3e8ec5  INSTALADORES_OFICIAIS/BOT.IA-Setup-1.0.2.exe
+
+Observacao: hashes calculados sobre arquivos entregues; .git, node_modules, caches, dist, release e ZIP excluidos.

@@ -1,0 +1,765 @@
+<!--
+  ============================================================================
+  ARQUIVO LEGADO — NÃO É O ENTRY POINT DO APLICATIVO.
+
+  Esta é uma versão standalone antiga (React via CDN esm.sh), mantida apenas
+  como referência histórica. NÃO é empacotada pelo electron-builder.
+
+  O BOT.IA é construído a partir de `src/main.jsx`:
+    - entry web              -> index.html  ->  /src/main.jsx (Vite)
+    - janela Electron        -> electron/main.cjs -> dist/index.html
+  NÃO edite este HTML esperando alterar o aplicativo. Edite `src/main.jsx`.
+  ============================================================================
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BOT.IA - Sistema Unificado V4 Split</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *{font-family:'Inter',sans-serif;box-sizing:border-box}
+    .font-mono{font-family:'JetBrains Mono',monospace!important}
+    html,body,#root{width:100%;height:100%;min-height:100%;overflow:hidden}
+    body{background:#121212;color:#EDEDED}
+    .custom-scrollbar::-webkit-scrollbar{width:4px;height:4px}
+    .custom-scrollbar::-webkit-scrollbar-thumb{background:#1E1E20;border-radius:10px}
+    input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:#2A2A2A;border-radius:4px;outline:none}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:white;cursor:pointer;border:2px solid #121212;box-shadow:0 0 0 1px rgba(255,255,255,0.15)}
+    /* Split layout */
+    .app-root{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;background:#121212}
+    .app-header{height:56px;min-height:56px;flex-shrink:0;border-bottom:1px solid rgba(30,30,32,0.6);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#1A1A1A;gap:12px}
+    @media(min-width:1024px){.app-header{height:60px;min-height:60px;padding:0 24px}}
+    .split-container{display:flex;flex:1;min-height:0;overflow:hidden;width:100%;position:relative}
+    .chat-panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:#1A1A1A;overflow:hidden}
+    .chat-scroll{flex:1;overflow-y:auto;background:#181818;display:flex;flex-direction:column;min-height:0}
+    .preview-panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:#151515;overflow:hidden}
+    .preview-scroll{flex:1;overflow-y:auto;min-height:0}
+    .divider{flex-shrink:0;background:rgba(30,30,32,0.6);position:relative;display:flex;align-items:center;justify-content:center;user-select:none;touch-action:none;z-index:2}
+    .divider::after{content:'';background:rgba(255,255,255,0.08);position:absolute}
+    .divider-horizontal{width:8px;cursor:col-resize}
+    .divider-horizontal::after{width:1px;height:100%;left:50%;top:0;transform:translateX(-50%)}
+    .divider-horizontal:hover,.divider-horizontal.dragging{background:rgba(255,255,255,0.06)}
+    .divider-horizontal:hover::after,.divider-horizontal.dragging::after{background:rgba(255,255,255,0.18);width:3px}
+    .divider-vertical{height:8px;cursor:row-resize;width:100%}
+    .divider-vertical::after{height:1px;width:100%;top:50%;left:0;transform:translateY(-50%)}
+    .divider-vertical:hover,.divider-vertical.dragging{background:rgba(255,255,255,0.06)}
+    .divider-vertical:hover::after,.divider-vertical.dragging::after{background:rgba(255,255,255,0.18);height:3px}
+    .divider:focus{outline:2px solid white;outline-offset:-2px}
+    .divider:focus-visible{outline:2px solid white}
+    @media(max-width:768px){
+      .split-container{flex-direction:column}
+      .chat-panel{width:100%!important}
+      .preview-panel{width:100%!important;border-left:none!important;border-top:1px solid rgba(30,30,32,0.6)}
+    }
+    /* Mobile stacking order is natural */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2A2A2A;border:1px solid rgba(255,255,255,0.1);padding:10px 16px;border-radius:999px;font-family:'JetBrains Mono';font-size:11px;color:white;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React from 'https://esm.sh/react@18.3.1';
+    import ReactDOM from 'https://esm.sh/react-dom@18.3.1/client';
+
+    const {useState,useEffect,useRef,useCallback} = React;
+
+    const defaultSkills = [
+      {id:"rag",icon:"📚",name:"RAG Local",desc:"Busca em documentos e memórias salvas antes de responder",prompt:"Você tem acesso a memórias e documentos do usuário. Sempre consulte o contexto de memória antes de responder e cite fontes quando relevante.",enabled:true},
+      {id:"csv",icon:"📊",name:"Analisador CSV",desc:"Interpreta planilhas e dados tabulares automaticamente",prompt:"Quando o usuário enviar CSV/tabela, identifique colunas, tipos, outliers e gere insights em formato estruturado. Use markdown table para resumir.",enabled:true},
+      {id:"gen",icon:"🤖",name:"Gerador de Agente",desc:"Cria sub-agentes especializados sob demanda",prompt:"Você pode sugerir a criação de um novo agente especializado quando detectar tarefa repetitiva. Formate como: [AGENT: nome | objetivo | prompt].",enabled:false},
+      {id:"sql",icon:"🗄️",name:"SQL Tool",desc:"Gera e otimiza queries SQL a partir de linguagem natural",prompt:"Traduza pedidos em SQL ANSI otimizado. Sempre explique a query, use CTEs quando complexo e alerte sobre riscos de DELETE/UPDATE sem WHERE.",enabled:false},
+    ];
+
+    const defaultAgent = {name:"BOT.IA Financeiro",systemPrompt:"Você é o BOT.IA, assistente financeiro especialista em fluxo de caixa, DRE e análises gerenciais. Seja direto, use markdown, foque em ação. Sempre considere memórias pinadas do usuário.",temperature:0.7,topP:0.9,maxTokens:2048};
+
+    function App(){
+      // Routing
+      const readRoute = () => {
+        const h = window.location.hash.replace(/^#/,'');
+        if(h==="config"||h==="config/") return "config/memoria";
+        if(["config/memoria","config/skills","config/agente"].includes(h)) return h;
+        return "chat";
+      };
+      const [routeVersion,setRouteVersion] = useState(0);
+      const currentRoute = readRoute();
+      const isChat = currentRoute==="chat";
+      const activeTab = currentRoute.startsWith("config/")? currentRoute.split("/")[1] : "memoria";
+      const navigate = (r) => {
+        const target = r==="chat"?"#chat":`#${r}`;
+        if(window.location.hash===target) setRouteVersion(v=>v+1);
+        else window.location.hash=target;
+      };
+      useEffect(()=>{
+        const sync=()=>{
+          const h=window.location.hash;
+          if(h==="#config"||h==="#config/"){window.location.hash="#config/memoria";return}
+          setRouteVersion(v=>v+1);
+        };
+        sync();
+        window.addEventListener('hashchange',sync);
+        return ()=>window.removeEventListener('hashchange',sync);
+      },[]);
+
+      // Core states
+      const [time,setTime] = useState("00:00:00");
+      const [input,setInput] = useState("");
+      const [messages,setMessages] = useState([
+        {id:"m1",from:"system",text:"BOT.IA • Sistema unificado v3 • Memória + Skills + Agente configurável • Split 50/50 sem sidebar",time:"10:30"},
+        {id:"m2",from:"them",text:"Memória ativa! Suas notas pinadas e skills serão injetadas automaticamente no agente. Layout agora em split horizontal com divisor arrastável.",time:"10:31"}
+      ]);
+      const [activeModel,setActiveModel] = useState(null);
+      const [ollamaOnline,setOllamaOnline] = useState(null);
+      const [baseUrl,setBaseUrl] = useState("http://localhost:11434");
+      const [models,setModels] = useState([]);
+      const [running,setRunning] = useState([]);
+      const [isStreaming,setIsStreaming] = useState(false);
+      const abortRef = useRef(null);
+      const bottomRef = useRef(null);
+      const [toast,setToast] = useState(null);
+      const [previewTab,setPreviewTab] = useState("Render");
+      const [memories,setMemories] = useState([]);
+      const [memTitle,setMemTitle] = useState("");
+      const [memContent,setMemContent] = useState("");
+      const [skills,setSkills] = useState(defaultSkills);
+      const [showNewSkill,setShowNewSkill] = useState(false);
+      const [newSkill,setNewSkill] = useState({icon:"✨",name:"",desc:"",prompt:"",enabled:true});
+      const [agent,setAgent] = useState(defaultAgent);
+      const [attached,setAttached] = useState([]);
+      const fileInputRef = useRef(null);
+
+      // Split states - REQUIREMENTS
+      const [splitPct,setSplitPct] = useState(50); // 50/50 initial
+      const [isDragging,setIsDragging] = useState(false);
+      const [isMobile,setIsMobile] = useState(window.innerWidth<=768);
+      const splitContainerRef = useRef(null);
+
+      useEffect(()=>{
+        const onResize = () => setIsMobile(window.innerWidth<=768);
+        window.addEventListener('resize',onResize);
+        return ()=>window.removeEventListener('resize',onResize);
+      },[]);
+
+      // Drag logic mouse/touch
+      const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
+      const startDrag = useCallback((e)=>{
+        e.preventDefault();
+        setIsDragging(true);
+      },[]);
+
+      useEffect(()=>{
+        if(!isDragging) return;
+        const handleMove = (clientX,clientY) => {
+          if(!splitContainerRef.current) return;
+          const rect = splitContainerRef.current.getBoundingClientRect();
+          let pct;
+          if(isMobile){
+            // vertical
+            pct = ((clientY - rect.top) / rect.height) * 100;
+          }else{
+            pct = ((clientX - rect.left) / rect.width) * 100;
+          }
+          pct = clamp(pct,30,70);
+          setSplitPct(pct);
+        };
+        const onMouseMove = (e)=>handleMove(e.clientX,e.clientY);
+        const onTouchMove = (e)=>{
+          if(e.touches[0]) handleMove(e.touches[0].clientX,e.touches[0].clientY);
+        };
+        const onUp = ()=>setIsDragging(false);
+        window.addEventListener('mousemove',onMouseMove);
+        window.addEventListener('mouseup',onUp);
+        window.addEventListener('touchmove',onTouchMove,{passive:false});
+        window.addEventListener('touchend',onUp);
+        document.body.style.cursor = isMobile ? 'row-resize' : 'col-resize';
+        document.body.style.userSelect='none';
+        return ()=>{
+          window.removeEventListener('mousemove',onMouseMove);
+          window.removeEventListener('mouseup',onUp);
+          window.removeEventListener('touchmove',onTouchMove);
+          window.removeEventListener('touchend',onUp);
+          document.body.style.cursor='';
+          document.body.style.userSelect='';
+        };
+      },[isDragging,isMobile]);
+
+      const onDividerKeyDown = (e)=>{
+        let delta=0;
+        if(!isMobile){
+          if(e.key==='ArrowLeft') delta=-1;
+          if(e.key==='ArrowRight') delta=1;
+        }else{
+          if(e.key==='ArrowUp') delta=-1;
+          if(e.key==='ArrowDown') delta=1;
+        }
+        if(e.key==='Home'){setSplitPct(30);e.preventDefault();return}
+        if(e.key==='End'){setSplitPct(70);e.preventDefault();return}
+        if(delta!==0){
+          e.preventDefault();
+          setSplitPct(p=>clamp(p+delta,30,70));
+        }
+        if(e.key==='PageDown'){setSplitPct(p=>clamp(p+5,30,70));e.preventDefault();}
+        if(e.key==='PageUp'){setSplitPct(p=>clamp(p-5,30,70));e.preventDefault();}
+      };
+
+      // Load from localStorage
+      useEffect(()=>{
+        try{const d=localStorage.getItem('botia_memories');if(d)setMemories(JSON.parse(d))}catch{}
+        try{const d=localStorage.getItem('botia_skills');if(d){const k=JSON.parse(d);if(Array.isArray(k)&&k.length)setSkills(k)}}catch{}
+        try{const d=localStorage.getItem('botia_agent');if(d)setAgent(JSON.parse(d))}catch{}
+      },[]);
+      useEffect(()=>{try{localStorage.setItem('botia_memories',JSON.stringify(memories))}catch{}},[memories]);
+      useEffect(()=>{try{localStorage.setItem('botia_skills',JSON.stringify(skills))}catch{}},[skills]);
+      useEffect(()=>{try{localStorage.setItem('botia_agent',JSON.stringify(agent))}catch{}},[agent]);
+      useEffect(()=>{const tick=()=>setTime(new Date().toLocaleTimeString('pt-BR',{hour12:false}));tick();const id=setInterval(tick,1000);return()=>clearInterval(id)},[]);
+      useEffect(()=>{if(!toast)return;const id=setTimeout(()=>setToast(null),3500);return()=>clearTimeout(id)},[toast]);
+      useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'})},[messages]);
+
+      // Ollama scan
+      useEffect(()=>{
+        let alive=true;
+        if(typeof window!=='undefined' && window.location.protocol==='file:'){setOllamaOnline(false);return}
+        const endpoints=["http://localhost:11434","http://127.0.0.1:11434","/ollama",""];
+        const scan=async()=>{
+          for(let ep of endpoints){
+            const tagsUrl = ep ? `${ep.replace(/\/$/,'')}/api/tags` : '/api/tags';
+            const psUrl = ep ? `${ep.replace(/\/$/,'')}/api/ps` : '/api/ps';
+            try{
+              const ctrl=new AbortController();
+              const t=setTimeout(()=>ctrl.abort(),2200);
+              const res=await fetch(tagsUrl,{signal:ctrl.signal});
+              clearTimeout(t);
+              if(!res.ok) continue;
+              const data=await res.json();
+              if(!data?.models) continue;
+              if(!alive) return;
+              setOllamaOnline(true);
+              setBaseUrl(ep||"http://localhost:11434");
+              setModels(data.models);
+              try{
+                const r2=await fetch(psUrl);
+                if(r2.ok){const d2=await r2.json();if(d2?.models?.length){setRunning(d2.models);if(!activeModel) setActiveModel(d2.models[0].name||d2.models[0].model)}}
+              }catch{}
+              const gem=data.models.find(m=>m.name.includes('gemma'));
+              if(gem && !activeModel && running.length===0) setActiveModel(prev=>prev||gem.name);
+              return;
+            }catch{continue}
+          }
+          if(alive){setOllamaOnline(false);setRunning([])}
+        };
+        scan();
+        const id=setInterval(scan,5000);
+        return ()=>{alive=false;clearInterval(id)}
+      },[activeModel]);
+
+      const formatSize = (b)=>{if(b<1024)return `${b}B`;if(b<1048576)return `${(b/1024).toFixed(1)}KB`;return `${(b/1048576).toFixed(1)}MB`};
+      const formatModelSize = (b)=>{if(!b)return '0B';const gb=b/1073741824;if(gb>=1)return `${gb.toFixed(1)}GB`;return `${(b/1048576).toFixed(0)}MB`};
+
+      const handleFiles = (e)=>{
+        const files=e.target.files;
+        if(!files||files.length===0) return;
+        const arr=Array.from(files).map(f=>({name:f.name,size:formatSize(f.size)}));
+        setAttached(prev=>[...prev,...arr].slice(0,5));
+        setToast(`${arr.length} arquivo(s) anexado(s)`);
+        if(fileInputRef.current) fileInputRef.current.value='';
+      };
+
+      const clearChat = ()=>{
+        setMessages([{id:`sys-${Date.now()}`,from:"system",text:`Conversas limpas • Agente: ${agent.name} • ${memories.length} memórias • ${skills.filter(s=>s.enabled).length} skills`,time:new Date().toLocaleTimeString('pt-BR',{hour:"2-digit",minute:"2-digit"}) }]);
+        setToast("Conversas limpas");
+      };
+
+      const buildContext = ()=>{
+        const pinned=memories.filter(m=>m.pinned);
+        const recent=memories.filter(m=>!m.pinned).slice(0,5);
+        const used=pinned.length?pinned:recent;
+        const activeSkills=skills.filter(s=>s.enabled);
+        let sys=agent.systemPrompt.trim();
+        if(used.length){sys+=`\n\n[MEMÓRIAS DO USUÁRIO]\n`+used.map(m=>`• ${m.title}: ${m.content}`).join("\n"); if(pinned.length) sys+=`\n(Nota: memórias pinadas são prioritárias)`}
+        if(activeSkills.length) sys+=`\n\n[SKILLS ATIVAS]\n`+activeSkills.map(s=>`• ${s.name} (${s.icon}): ${s.prompt}`).join("\n");
+        sys+=`\n\n[CONFIG AGENTE] Nome=${agent.name} | Temp=${agent.temperature} | TopP=${agent.topP} | MaxTokens=${agent.maxTokens}`;
+        return {system:sys,memoriesUsed:used,skillsUsed:activeSkills,options:{temperature:agent.temperature,top_p:agent.topP,num_predict:agent.maxTokens}}
+      };
+      const ctx = buildContext();
+
+      const sendMessage = async()=>{
+        const hasText=input.trim().length>0;
+        const hasFiles=attached.length>0;
+        if(!hasText && !hasFiles) return;
+        if(isStreaming) return;
+        const filesSuffix = hasFiles?` [${attached.map(f=>f.name).join(", ")}]`:"";
+        const textToSend = hasText?`${input}${filesSuffix}`:`Arquivos: ${filesSuffix}`;
+        const originalInput=input;
+        const filesCopy=[...attached];
+        const newMsg={id:Date.now().toString(),from:"me",text:textToSend,files:hasFiles?[...attached]:undefined,time:new Date().toLocaleTimeString('pt-BR',{hour:"2-digit",minute:"2-digit"})};
+        setMessages(prev=>[...prev,newMsg]);
+        setInput("");
+        setAttached([]);
+        const context=buildContext();
+        if(ollamaOnline && activeModel){
+          const id=(Date.now()+1).toString();
+          const apiUrl = baseUrl?`${baseUrl.replace(/\/$/,'')}/api/chat`:'/api/chat';
+          setMessages(prev=>[...prev,{id,from:"them",model:`${activeModel} • ${agent.name}`,text:"",streaming:true,time:new Date().toLocaleTimeString('pt-BR',{hour:"2-digit",minute:"2-digit"}),context}]);
+          setIsStreaming(true);
+          abortRef.current=new AbortController();
+          try{
+            const history=messages.filter(m=>m.from==="me"||m.from==="them").slice(-10).map(m=>({role:m.from==="me"?"user":"assistant",content:m.text}));
+            const payload={model:activeModel,messages:[{role:"system",content:context.system},...history,{role:"user",content:originalInput}],stream:true,options:context.options};
+            const res=await fetch(apiUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),signal:abortRef.current.signal});
+            if(!res.ok||!res.body) throw Error(`HTTP ${res.status}`);
+            const reader=res.body.getReader();
+            const decoder=new TextDecoder();
+            let buffer="",full="";
+            while(true){
+              const {done,value}=await reader.read();
+              if(done) break;
+              buffer+=decoder.decode(value,{stream:true});
+              const lines=buffer.split("\n");
+              buffer=lines.pop()||"";
+              for(const line of lines){
+                if(!line.trim()) continue;
+                try{
+                  const json=JSON.parse(line);
+                  if(json.message?.content){full+=json.message.content;setMessages(prev=>prev.map(m=>m.id===id?{...m,text:full}:m))}
+                }catch{}
+              }
+            }
+            setMessages(prev=>prev.map(m=>m.id===id?{...m,streaming:false,text:full||"[sem resposta]"}:m));
+          }catch(err){
+            if(err.name==="AbortError"){
+              setMessages(prev=>prev.map(m=>m.id===id?{...m,streaming:false,text:m.text+"\n[interrompido]"}:m));
+            }else{
+              setMessages(prev=>prev.filter(m=>m.id!==id).concat([{id:(Date.now()+2).toString(),from:"them",model:activeModel,text:`Erro ${apiUrl}: ${err.message}`,time:new Date().toLocaleTimeString('pt-BR',{hour:"2-digit",minute:"2-digit"})}]));
+            }
+          }finally{setIsStreaming(false);abortRef.current=null}
+          return;
+        }
+        setTimeout(()=>{
+          const c=buildContext();
+          setMessages(prev=>[...prev,{id:(Date.now()+1).toString(),from:"them",model:agent.name,text:`(${agent.name}) Contexto montado: ${c.memoriesUsed.length} memórias + ${c.skillsUsed.length} skills\n\nSystem: ${c.system.slice(0,180)}...\n\nVocê disse: "${originalInput.slice(0,120)}${filesCopy.length?` + ${filesCopy.length} arq`:""}"`,time:new Date().toLocaleTimeString('pt-BR',{hour:"2-digit",minute:"2-digit"}),context:c}]);
+        },300);
+      };
+
+      const activateModel = (name)=>{setActiveModel(name);setToast(`${name} ativado`)};
+      const stopModel = (name)=>{
+        const target=name||activeModel;
+        if(!target) return;
+        setActiveModel(null);
+        setRunning(prev=>prev.filter(m=>m.name!==target && m.model!==target));
+        setToast(`Modelo parado • ${target}`);
+      };
+
+      // Memories
+      const saveMemory = ()=>{
+        if(!memTitle.trim()||!memContent.trim()){setToast("Preencha título e conteúdo");return}
+        const m={id:Date.now().toString(),title:memTitle.trim(),content:memContent.trim(),pinned:false,createdAt:new Date().toISOString()};
+        setMemories(prev=>[m,...prev]);
+        setMemTitle("");setMemContent("");setToast(`Memória salva • "${m.title}"`);
+      };
+      const togglePin = (id)=>setMemories(prev=>prev.map(m=>m.id===id?{...m,pinned:!m.pinned}:m));
+      const deleteMemory = (id)=>setMemories(prev=>prev.filter(m=>m.id!==id));
+      const toggleSkill = (id)=>setSkills(prev=>prev.map(s=>s.id===id?{...s,enabled:!s.enabled}:s));
+      const createSkill = ()=>{
+        if(!newSkill.name.trim()||!newSkill.prompt.trim()){setToast("Nome e prompt obrigatórios");return}
+        const s={...newSkill,id:`skill_${Date.now()}`,name:newSkill.name.trim(),desc:newSkill.desc.trim()||"Skill personalizada",prompt:newSkill.prompt.trim()};
+        setSkills(prev=>[s,...prev]);
+        setNewSkill({icon:"✨",name:"",desc:"",prompt:"",enabled:true});
+        setShowNewSkill(false);
+        setToast(`Skill criada • ${s.name}`);
+      };
+      const deleteSkill = (id)=>{
+        if(defaultSkills.some(s=>s.id===id)){setToast("Skill padrão não pode ser removida, apenas desativada");return}
+        setSkills(prev=>prev.filter(s=>s.id!==id));
+      };
+
+      const pinnedCount=memories.filter(m=>m.pinned).length;
+      const activeSkillsCount=skills.filter(s=>s.enabled).length;
+
+      return React.createElement("div",{className:"app-root"},
+        // Header - no sidebar, only header with config button ⚙
+        React.createElement("header",{className:"app-header"},
+          React.createElement("div",{className:"flex items-center gap-3 min-w-0"},
+            React.createElement("div",{className:"w-8 h-8 rounded-[10px] bg-white text-black flex items-center justify-center font-bold text-[12px] shrink-0"},"B"),
+            React.createElement("div",{className:"leading-none min-w-0"},
+              React.createElement("p",{className:"font-semibold text-[13px] tracking-[-0.02em] text-white leading-none"},"BOT.IA"),
+              React.createElement("p",{className:"font-mono text-[9px] text-[#6A6A6A] mt-0.5 truncate"}, agent.name.split(" ").slice(0,2).join(" "))
+            ),
+            React.createElement("div",{className:"hidden md:flex items-center gap-1.5 font-mono text-[11px] ml-4 min-w-0"},
+              React.createElement("span",{className:"text-[#8A8A8A]"},"Sistema"),
+              React.createElement("span",{className:"text-[#5A5A5A]"},"›"),
+              React.createElement("span",{className:"text-white truncate"}, isChat? "Chat" : `Config / ${activeTab}`)
+            ),
+            isChat && activeModel && React.createElement("span",{className:"hidden lg:flex items-center gap-1.5 ml-2 font-mono text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 truncate"},
+              React.createElement("span",{className:"w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"}),
+              `${activeModel} • ${agent.name}`
+            )
+          ),
+          React.createElement("div",{className:"flex items-center gap-1.5 lg:gap-2 shrink-0"},
+            isChat && React.createElement("button",{onClick:clearChat,className:"h-[34px] px-3 rounded-lg bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] text-[#8A8A8A] hover:text-red-300 hover:border-red-500/30 hover:bg-red-500/10 flex items-center gap-1.5 transition-all font-mono text-[11px]"},
+              React.createElement("span",null,"🗑️"),
+              React.createElement("span",{className:"hidden sm:inline"},"Limpar")
+            ),
+            isChat && activeModel && React.createElement("button",{onClick:()=>stopModel(),className:"hidden md:flex h-[34px] px-3 rounded-lg bg-[#2A2A2A] border border-[rgba(30,30,32,0.6)] text-[11px] font-mono text-[#9A9A9A] hover:text-white items-center gap-1.5"},
+              "⏹️ Parar"
+            ),
+            // Single config button ⚙ in header - requirement 2
+            React.createElement("button",{
+              onClick:()=>navigate(isChat?"config/memoria":"chat"),
+              "aria-label":"Configurações",
+              title:"Configurações",
+              className:`w-[34px] h-[34px] rounded-lg border flex items-center justify-center transition-all ${!isChat?"bg-white text-black border-white":"bg-[#2A2A2A] border-[rgba(30,30,32,0.6)] text-[#8A8A8A] hover:text-white hover:bg-white/[0.06]"}`
+            }, "⚙")
+          )
+        ),
+        // Main area
+        React.createElement("main",{className:"flex-1 flex flex-col min-w-0 overflow-hidden bg-[#121212] relative"},
+          isChat ?
+            // SPLIT HORIZONTAL - requirement 3
+            React.createElement("div",{ref:splitContainerRef,className:"split-container",style:{'--chat-size':`${splitPct}%`}},
+              // Chat left
+              React.createElement("div",{className:"chat-panel",style:isMobile?{height:`${splitPct}%`,width:"100%"}:{width:`${splitPct}%`}},
+                React.createElement("div",{className:"chat-scroll custom-scrollbar"},
+                  React.createElement("div",{className:"flex-1 w-full px-4 lg:px-6 py-6 space-y-4"},
+                    React.createElement("div",{className:"flex items-center gap-2 px-3 py-2 rounded-full bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] w-fit font-mono text-[10px] text-[#8A8A8A]"},
+                      React.createElement("span",null,"🤖"),
+                      React.createElement("span",{className:"text-white font-medium"},agent.name),
+                      React.createElement("span",null,"•"),
+                      React.createElement("span",{className:"flex items-center gap-1"},"🧠 ",ctx.memoriesUsed.length," memórias"),
+                      React.createElement("span",null,"•"),
+                      React.createElement("span",{className:"flex items-center gap-1"},"🧩 ",ctx.skillsUsed.length," skills"),
+                      React.createElement("span",null,"•"),
+                      React.createElement("span",null,`T ${agent.temperature} • P ${agent.topP}`)
+                    ),
+                    messages.map(m=>{
+                      if(m.from==="system") return React.createElement("div",{key:m.id,className:"flex justify-center py-2"},
+                        React.createElement("div",{className:"px-4 py-2 rounded-full bg-[#2A2A2A] border border-[rgba(30,30,32,0.6)] font-mono text-[11px] text-[#8A8A8A] flex items-center gap-2 max-w-[90%] text-center"},
+                          React.createElement("span",null,"⚙️"),
+                          React.createElement("span",{className:"truncate"},m.text),
+                          React.createElement("span",{className:"text-[#5A5A5A] shrink-0"},m.time)
+                        )
+                      );
+                      return React.createElement("div",{key:m.id,className:`flex ${m.from==="me"?"justify-end":"justify-start"}`},
+                        React.createElement("div",{className:`max-w-[85%] rounded-2xl px-5 py-3 transition-colors ${m.from==="me"?"bg-white text-black rounded-br-md":"bg-[#2A2A2A] border border-[rgba(30,30,32,0.6)] text-[#EDEDED] rounded-bl-md hover:border-white/10"}`},
+                          m.model && React.createElement("p",{className:"font-mono text-[10px] text-emerald-400 mb-1.5"},m.model),
+                          React.createElement("p",{className:"text-[14px] leading-[1.6] whitespace-pre-wrap"},m.text),
+                          m.context && m.from==="them" && React.createElement("div",{className:"mt-3 pt-3 border-t border-white/10 flex flex-wrap gap-1.5"},
+                            m.context.memoriesUsed.map(k=>React.createElement("span",{key:k.id,className:`px-2 py-0.5 rounded-full text-[9px] font-mono border ${k.pinned?"bg-amber-500/10 border-amber-500/20 text-amber-300":"bg-[#1E1E1E] border-white/10 text-[#8A8A8A]"}`},`📌 ${k.title}`)),
+                            m.context.skillsUsed.map(k=>React.createElement("span",{key:k.id,className:"px-2 py-0.5 rounded-full text-[9px] font-mono bg-white/5 border border-white/10 text-[#9A9A9A]"},`${k.icon} ${k.name}`))
+                          ),
+                          m.files && React.createElement("div",{className:"mt-2.5 flex flex-wrap gap-1.5"},
+                            m.files.map((f,i)=>React.createElement("span",{key:`${f.name}-${i}`,className:`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono border ${m.from==="me"?"bg-black/10 border-black/10 text-black/70":"bg-[#1E1E1E] border-[rgba(30,30,32,0.6)] text-[#9A9A9A]"}`},`📎 ${f.name}`))
+                          ),
+                          React.createElement("span",{className:`font-mono text-[10px] mt-2 block ${m.from==="me"?"text-black/60":"text-[#6A6A6A]"}`},m.time)
+                        )
+                      )
+                    }),
+                    React.createElement("div",{ref:bottomRef})
+                  )
+                ),
+                // Input area
+                React.createElement("div",{className:"w-full flex flex-col p-4 border-t border-[rgba(30,30,32,0.6)] bg-[#1A1A1A] shrink-0 gap-2"},
+                  attached.length>0 && React.createElement("div",{className:"w-full flex flex-wrap gap-2 px-1 pb-1"},
+                    attached.map((f,i)=>React.createElement("div",{key:`${f.name}-${i}`,className:"flex items-center gap-2 h-[28px] px-2.5 rounded-full bg-[#2A2A2A] border border-[rgba(30,30,32,0.6)] font-mono text-[11px] text-[#CFCFCF]"},
+                      React.createElement("span",null,"📎"),
+                      React.createElement("span",{className:"max-w-[140px] truncate"},f.name),
+                      React.createElement("span",{className:"text-[#5A5A5A] text-[10px]"},f.size),
+                      React.createElement("button",{onClick:()=>setAttached(prev=>prev.filter((_,idx)=>idx!==i)),className:"w-4 h-4 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center ml-1"},"✕")
+                    ))
+                  ),
+                  React.createElement("div",{className:"w-full h-[52px] bg-[#1E1E1E] border border-white/10 rounded-full flex items-center px-2 gap-2 shadow-lg shadow-black/20 focus-within:border-white/20 transition-colors"},
+                    React.createElement("button",{type:"button",onClick:()=>fileInputRef.current?.click(),className:"w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0"},"＋"),
+                    React.createElement("input",{value:input,onChange:e=>setInput(e.target.value),onKeyDown:e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}},placeholder:activeModel?`Pergunte ao ${agent.name}...`:"Digite mesmo sem modelo...",className:"flex-1 bg-transparent border-none outline-none text-[14px] text-white placeholder:text-white/40 font-mono"}),
+                    React.createElement("button",{type:"button",onClick:sendMessage,disabled:!input.trim()&&attached.length===0,className:"w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-white/90 disabled:opacity-40 shrink-0"},"↑")
+                  ),
+                  React.createElement("input",{ref:fileInputRef,type:"file",multiple:true,className:"hidden",onChange:handleFiles,accept:".txt,.md,.pdf,.json,.csv,.png,.jpg,.jpeg,.webp"}),
+                  React.createElement("p",{className:"font-mono text-[10px] text-[#5A5A5A] px-1 flex items-center gap-2 w-full"},
+                    React.createElement("span",null,`Enter para enviar • ${agent.name} • ${baseUrl}`),
+                    React.createElement("span",{className:"ml-auto hidden sm:flex items-center gap-1"},
+                      React.createElement("span",{className:"w-1 h-1 bg-emerald-400 rounded-full animate-pulse"}),
+                      ` ${memories.length} memórias • ${activeSkillsCount} skills • #121212`
+                    )
+                  )
+                )
+              ),
+              // Divider central arrastável - requirement 4
+              React.createElement("div",{
+                role:"separator",
+                "aria-label":"Redimensionar painéis",
+                "aria-orientation": isMobile? "horizontal":"vertical",
+                "aria-valuenow": Math.round(splitPct),
+                "aria-valuemin": 30,
+                "aria-valuemax": 70,
+                tabIndex:0,
+                onMouseDown:startDrag,
+                onTouchStart:startDrag,
+                onKeyDown:onDividerKeyDown,
+                className:`divider ${isMobile?"divider-vertical":"divider-horizontal"} ${isDragging?"dragging":""}`
+              },
+                React.createElement("div",{className:"w-6 h-6 rounded-full bg-[#2A2A2A] border border-white/10 flex items-center justify-center text-[10px] text-white/60 shadow-lg hidden md:flex"}, isMobile?"↕":"↔")
+              ),
+              // Preview right - requirement 3 and 7
+              React.createElement("div",{className:"preview-panel",style:isMobile?{height:`${100-splitPct}%`,width:"100%"}:{width:`${100-splitPct}%`}},
+                React.createElement("div",{className:"h-[48px] shrink-0 border-b border-[rgba(30,30,32,0.6)] px-4 flex items-center justify-between bg-[#151515]"},
+                  React.createElement("div",{className:"flex items-center gap-2.5"},
+                    React.createElement("div",{className:"w-6 h-6 rounded-md bg-white/[0.06] border border-white/[0.06] flex items-center justify-center"},"👁️"),
+                    React.createElement("span",{className:"text-[13px] font-semibold text-white"},"Preview"),
+                    React.createElement("div",{className:"ml-2 hidden xl:flex items-center p-0.5 rounded-full bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)]"},
+                      ["Render","Código","Dados"].map(tab=>React.createElement("button",{key:tab,onClick:()=>setPreviewTab(tab),className:`h-[22px] px-2.5 rounded-full font-mono text-[10px] ${previewTab===tab?"bg-white text-black":"text-[#8A8A8A] hover:text-white"}`},tab))
+                    )
+                  ),
+                  React.createElement("span",{className:"font-mono text-[10px] text-[#5A5A5A] hidden md:block"},`{${Math.round(splitPct)}/${Math.round(100-splitPct)}}`)
+                ),
+                // Mobile tabs
+                React.createElement("div",{className:"xl:hidden px-4 py-2 border-b border-[rgba(30,30,32,0.6)] bg-[#151515] flex gap-1"},
+                  ["Render","Código","Dados"].map(tab=>React.createElement("button",{key:tab,onClick:()=>setPreviewTab(tab),className:`h-[28px] px-3 rounded-full font-mono text-[11px] ${previewTab===tab?"bg-white text-black":"bg-[#1E1E1E] text-[#8A8A8A] border border-white/10"}`},tab))
+                ),
+                React.createElement("div",{className:"preview-scroll custom-scrollbar p-4 bg-[#151515] space-y-4"},
+                  previewTab==="Render" && React.createElement(React.Fragment,null,
+                    React.createElement("div",{className:"rounded-xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-4"},
+                      React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] uppercase tracking-wider flex items-center gap-1.5"},"💾 Modelos no PC • ",baseUrl.replace("http://","")),
+                      React.createElement("div",{className:"mt-3 space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar"},
+                        models.length===0? React.createElement("p",{className:"font-mono text-[11px] text-[#5A5A5A]"},"Escaneando /api/tags a cada 5s...") :
+                        models.slice(0,8).map(m=>{
+                          const isRunning=running.some(r=>r.name===m.name)||activeModel===m.name;
+                          return React.createElement("div",{key:m.name,className:`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border ${isRunning?"bg-emerald-500/10 border-emerald-500/20":"bg-[#151515] border-[rgba(30,30,32,0.6)]"}`},
+                            React.createElement("span",{className:`text-[12px] ${isRunning?"text-emerald-300":"text-[#6A6A6A]"}`},"●"),
+                            React.createElement("div",{className:"flex-1 min-w-0"},
+                              React.createElement("p",{className:"font-mono text-[11px] text-white truncate"},m.name),
+                              React.createElement("p",{className:"font-mono text-[9px] text-[#6A6A6A]"},`${formatModelSize(m.size)} • ${isRunning?"rodando":"instalado"}`)
+                            ),
+                            isRunning? React.createElement("button",{onClick:()=>stopModel(m.name),className:"w-6 h-6 rounded-md bg-[#2A2A2A] border border-[rgba(30,30,32,0.6)] flex items-center justify-center text-[10px]"},"⏹️") :
+                            React.createElement("button",{onClick:()=>activateModel(m.name),className:"w-6 h-6 rounded-md bg-white text-black flex items-center justify-center text-[10px]"},"▶️")
+                          )
+                        })
+                      )
+                    ),
+                    React.createElement("div",{className:"rounded-xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-4"},
+                      React.createElement("div",{className:"flex items-center justify-between"},
+                        React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] uppercase tracking-wider flex items-center gap-1.5"},"🧠 Memórias recentes • ",memories.length),
+                        pinnedCount>0 && React.createElement("span",{className:"font-mono text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300"},`${pinnedCount} pinadas`)
+                      ),
+                      React.createElement("div",{className:"mt-3 space-y-2"},
+                        memories.slice(0,4).map(mem=>React.createElement("div",{key:mem.id,className:`px-3 py-2 rounded-lg border text-[11px] ${mem.pinned?"bg-amber-500/10 border-amber-500/20 text-amber-100":"bg-[#151515] border-[rgba(30,30,32,0.6)] text-[#9A9A9A]"}`},
+                          React.createElement("div",{className:"flex items-center gap-1.5 font-medium text-white text-[11px]"},
+                            React.createElement("span",null,mem.pinned?"📌":"🧠"),
+                            React.createElement("span",{className:"truncate"},mem.title)
+                          ),
+                          React.createElement("p",{className:"font-mono text-[10px] mt-1 line-clamp-2 opacity-80"},mem.content)
+                        )),
+                        memories.length===0 && React.createElement("p",{className:"font-mono text-[11px] text-[#5A5A5A]"},"Nenhuma memória salva ainda. Vá em Configurações → Memória Manual.")
+                      )
+                    ),
+                    React.createElement("div",{className:"rounded-xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-4"},
+                      React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] uppercase tracking-wider"},"Contexto que será enviado"),
+                      React.createElement("div",{className:"mt-3 rounded-lg bg-[#0F0F0F] border border-[rgba(30,30,32,0.6)] p-3 font-mono text-[10px] text-[#8A8A8A] whitespace-pre-wrap max-h-[200px] overflow-y-auto custom-scrollbar"},ctx.system.slice(0,900)+(ctx.system.length>900?"...":"")),
+                      React.createElement("div",{className:"mt-2 flex flex-wrap gap-1.5"},
+                        React.createElement("span",{className:"font-mono text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white"},`T ${agent.temperature}`),
+                        React.createElement("span",{className:"font-mono text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white"},`TopP ${agent.topP}`),
+                        React.createElement("span",{className:"font-mono text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white"},`${agent.maxTokens} tokens`)
+                      )
+                    )
+                  ),
+                  previewTab==="Código" && React.createElement("div",{className:"rounded-xl overflow-hidden border border-[rgba(30,30,32,0.6)] bg-[#0F0F0F]"},
+                    React.createElement("div",{className:"h-[36px] px-4 flex items-center border-b border-[rgba(30,30,32,0.6)] bg-[#121212] font-mono text-[11px] text-[#8A8A8A]"},"buildContextWithMemory() → Ollama options"),
+                    React.createElement("div",{className:"p-4 font-mono text-[11px] text-[#8A8A8A] whitespace-pre-wrap"},`// buildContextWithMemory()
+// System = agent.systemPrompt
+// + memorias pinadas OU 5 recentes
+// + skills ativas
+// + config T, TopP, MaxTokens
+
+fetch(ollamaBaseUrl + "/api/chat", {
+  model: "${activeModel||"gemma3:4b"}",
+  messages: [
+    { role: "system", content: ctx.system },
+    ...history
+  ],
+  stream: true,
+  options: {
+    temperature: ${agent.temperature},
+    top_p: ${agent.topP},
+    num_predict: ${agent.maxTokens}
+  }
+})
+
+// localStorage keys:
+// botia_memories
+// botia_skills
+// botia_agent
+`)
+                  ),
+                  previewTab==="Dados" && React.createElement("div",{className:"rounded-xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-4 space-y-3 font-mono text-[11px]"},
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Agente"),React.createElement("span",{className:"text-white"},agent.name)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Memórias"),React.createElement("span",{className:"text-white"},`${memories.length} total • ${pinnedCount} pinadas`)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Skills ativas"),React.createElement("span",{className:"text-emerald-300"},`${activeSkillsCount} / ${skills.length}`)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Temperature"),React.createElement("span",{className:"text-white"},agent.temperature)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Top P"),React.createElement("span",{className:"text-white"},agent.topP)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Max Tokens"),React.createElement("span",{className:"text-white"},agent.maxTokens)),
+                    React.createElement("div",{className:"flex justify-between"},React.createElement("span",{className:"text-[#6A6A6A]"},"Endpoint"),React.createElement("span",{className:"text-white text-[10px]"},baseUrl)),
+                    React.createElement("div",{className:"mt-4 p-3 rounded-xl bg-[#1E1E1E] border border-white/5 text-[10px] text-[#6A6A6A]"},"buildContextWithMemory() monta tudo e envia para /api/chat com options."),
+                    React.createElement("div",{className:"mt-2 flex items-center gap-2 font-mono text-[10px] text-[#5A5A5A]"},
+                      React.createElement("span",{className:`w-2 h-2 rounded-full ${ollamaOnline?"bg-emerald-400":"bg-red-400"}`}),
+                      `Ollama ${ollamaOnline===null?"Scan...":ollamaOnline?"Online":"Offline"} • ${models.length} modelos`
+                    )
+                  )
+                ),
+                React.createElement("div",{className:"h-[32px] shrink-0 border-t border-[rgba(30,30,32,0.6)] px-4 flex items-center justify-between bg-[#121212]"},
+                  React.createElement("span",{className:"font-mono text-[10px] text-[#5A5A5A]"},`BOT.IA v3 • ${memories.length} memórias • ${activeSkillsCount} skills • ${Math.round(splitPct)}/${Math.round(100-splitPct)}`),
+                  React.createElement("span",{className:"font-mono text-[10px] text-[#5A5A5A] flex items-center gap-1"},
+                    React.createElement("span",{className:"w-1 h-1 rounded-full bg-emerald-400"})," local"
+                  )
+                )
+              )
+            )
+          :
+            // SETTINGS PAGE - full width, no sidebar
+            React.createElement("div",{className:"flex-1 overflow-y-auto custom-scrollbar bg-[#121212]"},
+              React.createElement("div",{className:"w-full max-w-[1200px] mx-auto px-4 lg:px-8 py-6"},
+                React.createElement("div",{className:"flex flex-col gap-4"},
+                  React.createElement("div",{className:"flex items-start justify-between gap-4"},
+                    React.createElement("div",null,
+                      React.createElement("h1",{className:"text-[22px] font-semibold tracking-[-0.02em] text-white leading-none flex items-center gap-2"},"⚙️ Configurações"),
+                      React.createElement("p",{className:"font-mono text-[11px] text-[#8A8A8A] mt-2"},"Memória manual + Skills + Agente • salvo em localStorage • BOT.IA #121212 • sem sidebar • split 50/50")
+                    ),
+                    React.createElement("button",{onClick:()=>navigate("chat"),className:"h-[36px] px-4 rounded-full bg-white text-black text-[12px] font-medium flex items-center gap-1.5"},"← Voltar ao Chat")
+                  ),
+                  React.createElement("div",{className:"flex items-center p-1 rounded-full bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] w-fit"},
+                    ["memoria","skills","agente"].map(tab=>React.createElement("button",{key:tab,onClick:()=>navigate(`config/${tab}`),className:`h-[34px] px-4 rounded-full font-mono text-[11px] transition-all ${activeTab===tab?"bg-white text-black":"text-[#8A8A8A] hover:text-white"}`},tab==="memoria"?"Memória Manual":tab==="skills"?"Skills":"Agente"))
+                  ),
+                  // Content
+                  activeTab==="memoria" && React.createElement("div",{className:"grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6"},
+                    React.createElement("div",{className:"space-y-4"},
+                      React.createElement("section",{className:"rounded-2xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-5"},
+                        React.createElement("h3",{className:"font-mono text-[11px] text-[#8A8A8A] uppercase tracking-wider flex items-center gap-2"},"🧠 Nova memória"),
+                        React.createElement("div",{className:"mt-4 space-y-3"},
+                          React.createElement("input",{value:memTitle,onChange:e=>setMemTitle(e.target.value),placeholder:"Título (ex: Preferência do usuário)",className:"w-full h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-[rgba(30,30,32,0.6)] text-white text-[13px] outline-none focus:border-white/20"}),
+                          React.createElement("textarea",{value:memContent,onChange:e=>setMemContent(e.target.value),placeholder:"Conteúdo da memória...",className:"w-full min-h-[120px] p-3 rounded-lg bg-[#0F0F0F] border border-[rgba(30,30,32,0.6)] text-white text-[13px] outline-none focus:border-white/20 resize-none"}),
+                          React.createElement("button",{onClick:saveMemory,className:"w-full h-[40px] rounded-full bg-white text-black text-[13px] font-medium"},"Salvar memória")
+                        )
+                      ),
+                      React.createElement("div",{className:"rounded-2xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-4"},
+                        React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] uppercase"},"Preview do contexto que será enviado"),
+                        React.createElement("div",{className:"mt-3 rounded-xl bg-[#0F0F0F] border border-[rgba(30,30,32,0.6)] p-3 font-mono text-[10px] text-[#8A8A8A] whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar"},ctx.system.slice(0,800)+(ctx.system.length>800?"...":""))
+                      )
+                    ),
+                    React.createElement("div",{className:"space-y-3"},
+                      memories.length===0? React.createElement("div",{className:"rounded-2xl border border-dashed border-white/10 p-12 flex flex-col items-center justify-center text-center"},
+                        React.createElement("p",{className:"text-white font-medium"},"Nenhuma memória ainda"),
+                        React.createElement("p",{className:"font-mono text-[11px] text-[#6A6A6A] mt-1"},"Crie sua primeira memória ao lado")
+                      ) :
+                      memories.map(m=>React.createElement("div",{key:m.id,className:`rounded-2xl border p-4 ${m.pinned?"bg-amber-500/10 border-amber-500/20":"bg-[#1E1E1E] border-[rgba(30,30,32,0.6)]"}`},
+                        React.createElement("div",{className:"flex items-start justify-between gap-3"},
+                          React.createElement("div",{className:"flex-1 min-w-0"},
+                            React.createElement("p",{className:"font-medium text-white text-[13px] flex items-center gap-1.5 truncate"},m.pinned?"📌":"🧠",m.title),
+                            React.createElement("p",{className:"font-mono text-[11px] text-[#8A8A8A] mt-1 whitespace-pre-wrap"},m.content),
+                            React.createElement("p",{className:"font-mono text-[9px] text-[#5A5A5A] mt-2"},new Date(m.createdAt).toLocaleString('pt-BR'))
+                          ),
+                          React.createElement("div",{className:"flex items-center gap-1 shrink-0"},
+                            React.createElement("button",{onClick:()=>togglePin(m.id),className:`w-8 h-8 rounded-lg flex items-center justify-center border ${m.pinned?"bg-amber-500 text-black border-amber-500":"bg-[#0F0F0F] border-white/10 text-white/60 hover:text-white"}`},m.pinned?"📌":"📍"),
+                            React.createElement("button",{onClick:()=>deleteMemory(m.id),className:"w-8 h-8 rounded-lg bg-[#0F0F0F] border border-white/10 text-white/60 hover:text-red-300 flex items-center justify-center"},"🗑️")
+                          )
+                        )
+                      ))
+                    )
+                  ),
+                  activeTab==="skills" && React.createElement("div",{className:"space-y-4"},
+                    React.createElement("div",{className:"flex items-center justify-between"},
+                      React.createElement("p",{className:"font-mono text-[11px] text-[#8A8A8A]"},`${activeSkillsCount} ativas / ${skills.length} total`),
+                      React.createElement("button",{onClick:()=>setShowNewSkill(true),className:"h-[36px] px-4 rounded-full bg-white text-black text-[12px] font-medium"},"＋ Nova skill")
+                    ),
+                    showNewSkill && React.createElement("div",{className:"rounded-2xl bg-[#1E1E1E] border border-white/10 p-5"},
+                      React.createElement("h3",{className:"font-medium text-white"},"Criar skill personalizada"),
+                      React.createElement("div",{className:"mt-4 grid grid-cols-1 md:grid-cols-2 gap-3"},
+                        React.createElement("input",{value:newSkill.name,onChange:e=>setNewSkill({...newSkill,name:e.target.value}),placeholder:"Nome",className:"h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none"}),
+                        React.createElement("input",{value:newSkill.icon,onChange:e=>setNewSkill({...newSkill,icon:e.target.value}),placeholder:"Ícone (emoji)",className:"h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none"}),
+                        React.createElement("input",{value:newSkill.desc,onChange:e=>setNewSkill({...newSkill,desc:e.target.value}),placeholder:"Descrição curta",className:"md:col-span-2 h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none"}),
+                        React.createElement("textarea",{value:newSkill.prompt,onChange:e=>setNewSkill({...newSkill,prompt:e.target.value}),placeholder:"Prompt da skill...",className:"md:col-span-2 min-h-[100px] p-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none resize-none"})
+                      ),
+                      React.createElement("div",{className:"mt-3 flex gap-2"},
+                        React.createElement("button",{onClick:createSkill,className:"h-[36px] px-4 rounded-full bg-white text-black text-[12px] font-medium"},"Criar"),
+                        React.createElement("button",{onClick:()=>setShowNewSkill(false),className:"h-[36px] px-4 rounded-full bg-[#2A2A2A] border border-white/10 text-white text-[12px]"},"Cancelar")
+                      )
+                    ),
+                    React.createElement("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-4"},
+                      skills.map(s=>React.createElement("div",{key:s.id,className:`rounded-2xl border p-5 ${s.enabled?"bg-[#1E1E1E] border-[rgba(30,30,32,0.6)]":"bg-[#151515] border-white/5 opacity-70"}`},
+                        React.createElement("div",{className:"flex items-start justify-between gap-3"},
+                          React.createElement("div",{className:"flex gap-3"},
+                            React.createElement("span",{className:"text-[20px]"},s.icon),
+                            React.createElement("div",null,
+                              React.createElement("p",{className:"font-medium text-white text-[13px]"},s.name),
+                              React.createElement("p",{className:"font-mono text-[11px] text-[#8A8A8A] mt-0.5"},s.desc)
+                            )
+                          ),
+                          React.createElement("button",{onClick:()=>toggleSkill(s.id),className:`w-10 h-6 rounded-full p-0.5 transition-all ${s.enabled?"bg-white":"bg-[#2A2A2A] border border-white/10"}`},
+                            React.createElement("div",{className:`w-5 h-5 rounded-full transition-all ${s.enabled?"bg-black translate-x-4":"bg-[#6A6A6A] translate-x-0"}`})
+                          )
+                        ),
+                        React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] mt-3 line-clamp-3"},s.prompt),
+                        React.createElement("div",{className:"mt-3 flex gap-2"},
+                          React.createElement("button",{onClick:()=>deleteSkill(s.id),className:"text-[11px] font-mono text-[#5A5A5A] hover:text-red-300"},"Remover")
+                        )
+                      ))
+                    )
+                  ),
+                  activeTab==="agente" && React.createElement("div",{className:"grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6"},
+                    React.createElement("div",{className:"space-y-4"},
+                      React.createElement("section",{className:"rounded-2xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-5"},
+                        React.createElement("h3",{className:"font-mono text-[11px] text-[#8A8A8A] uppercase"},"Configuração do agente"),
+                        React.createElement("div",{className:"mt-4 space-y-4"},
+                          React.createElement("div",null,
+                            React.createElement("label",{className:"font-mono text-[11px] text-[#8A8A8A]"},"Nome"),
+                            React.createElement("input",{value:agent.name,onChange:e=>setAgent({...agent,name:e.target.value}),className:"mt-1 w-full h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none"})
+                          ),
+                          React.createElement("div",null,
+                            React.createElement("label",{className:"font-mono text-[11px] text-[#8A8A8A]"},"System Prompt"),
+                            React.createElement("textarea",{value:agent.systemPrompt,onChange:e=>setAgent({...agent,systemPrompt:e.target.value}),className:"mt-1 w-full min-h-[160px] p-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[13px] outline-none resize-none"})
+                          ),
+                          React.createElement("div",{className:"grid grid-cols-3 gap-3"},
+                            React.createElement("div",null,
+                              React.createElement("label",{className:"font-mono text-[10px] text-[#6A6A6A]"},`Temperature ${agent.temperature}`),
+                              React.createElement("input",{type:"range",min:0,max:2,step:0.1,value:agent.temperature,onChange:e=>setAgent({...agent,temperature:parseFloat(e.target.value)}),className:"w-full mt-2"})
+                            ),
+                            React.createElement("div",null,
+                              React.createElement("label",{className:"font-mono text-[10px] text-[#6A6A6A]"},`Top P ${agent.topP}`),
+                              React.createElement("input",{type:"range",min:0,max:1,step:0.05,value:agent.topP,onChange:e=>setAgent({...agent,topP:parseFloat(e.target.value)}),className:"w-full mt-2"})
+                            ),
+                            React.createElement("div",null,
+                              React.createElement("label",{className:"font-mono text-[10px] text-[#6A6A6A]"},`Max Tokens ${agent.maxTokens}`),
+                              React.createElement("input",{type:"range",min:256,max:4096,step:128,value:agent.maxTokens,onChange:e=>setAgent({...agent,maxTokens:parseInt(e.target.value)}),className:"w-full mt-2"})
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    React.createElement("div",{className:"space-y-4"},
+                      React.createElement("div",{className:"rounded-2xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-5"},
+                        React.createElement("h3",{className:"font-mono text-[11px] text-[#8A8A8A] uppercase flex items-center gap-2"},"👁️ Preview do contexto que será enviado"),
+                        React.createElement("div",{className:"mt-4 rounded-xl bg-[#0F0F0F] border border-[rgba(30,30,32,0.6)] p-4 font-mono text-[11px] text-[#8A8A8A] whitespace-pre-wrap max-h-[520px] overflow-y-auto custom-scrollbar leading-[1.6]"},ctx.system),
+                        React.createElement("div",{className:"mt-3 flex flex-wrap gap-2"},
+                          React.createElement("span",{className:"px-2.5 py-1 rounded-full bg-white text-black font-mono text-[10px]"},agent.name),
+                          React.createElement("span",{className:"px-2.5 py-1 rounded-full bg-[#2A2A2A] border border-white/10 text-[#9A9A9A] font-mono text-[10px]"},`${ctx.memoriesUsed.length} memórias`),
+                          React.createElement("span",{className:"px-2.5 py-1 rounded-full bg-[#2A2A2A] border border-white/10 text-[#9A9A9A] font-mono text-[10px]"},`${ctx.skillsUsed.length} skills`),
+                          React.createElement("span",{className:"px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono text-[10px]"},`T ${agent.temperature} • P ${agent.topP} • ${agent.maxTokens}`)
+                        )
+                      ),
+                      React.createElement("div",{className:"rounded-2xl bg-[#1E1E1E] border border-[rgba(30,30,32,0.6)] p-5"},
+                        React.createElement("p",{className:"font-mono text-[10px] text-[#6A6A6A] uppercase"},"Endpoint Ollama"),
+                        React.createElement("input",{value:baseUrl,onChange:e=>setBaseUrl(e.target.value),className:"mt-2 w-full h-[40px] px-3 rounded-lg bg-[#0F0F0F] border border-white/10 text-white text-[12px] font-mono outline-none"}),
+                        React.createElement("p",{className:"font-mono text-[10px] text-[#5A5A5A] mt-2"},"Troque para /ollama se usar proxy, ou IP da máquina na rede.")
+                      )
+                    )
+                  )
+                )
+              )
+            )
+        ),
+        toast && React.createElement("div",{className:"toast"},toast)
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
